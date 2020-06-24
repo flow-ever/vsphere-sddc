@@ -1,0 +1,163 @@
+---
+  #debug variable ESXi_Hosts
+#  - name: print variable ESXi_hosts
+#    debug: 
+#      msg: "{{ item.MACAddr }}"
+#    loop:
+#      "{{ ESXi_Hosts }}"
+  
+#  - meta: end_play
+
+  #prepare OS install media for yum repository source
+  - name: mount OS iso
+    mount:
+      path: "{{ centos_mount_path }}"
+      src: "{{ iso_dir }}/{{ centos_iso_name }}"
+      fstype: iso9660
+      opts: ro,noauto,loop
+      state: mounted
+
+  #Create DVD repo file
+  - name: create new repo file for DVD repository
+    file:
+      content:  |
+        [dvd]
+        name=dvd repo
+        baseurl=file://{{ centos_mount_path }}
+        enbaled=1
+        gpgcheck=0
+      dest: "{{ yum_repo_file }}"
+      state: touch
+
+  #install dhcp,apache,tftp,syslinux packages
+  - name: install packages {{ item }}
+    yum:
+      name: "{{ item }}"
+      state: present
+    loop:
+      "{{ install_base_packages }}"
+
+#  - name: start service {{ item }}
+#    service:
+#        name: "{{ item }}"
+#        state: started
+#    loop:
+#      "{{ services }}"
+
+  #config dhcp  server
+  - name: copy config file {{ dhcpd_config_file }} to {{ dhcpd_config_dir }}
+    copy:
+      src: "{{ dhcp_config_file }}"
+      dest: "{{ dhcp_config_dir }}"
+      force: yes
+
+  - name: config tftp server
+    replace:
+      path: "{{ tftp_config_file }}"
+      after: "disabled"
+      regexp: "yes"
+      replace: "no"
+
+  # restart dhcpd ,xientd,tftpd
+  - name: restart {{ item}} service
+    service:
+      name: "{{ item }}"
+      state: restarted
+    loop:
+      "{{ services }}"
+
+  #open port for dhcp, tftpd and httpd 
+  - name: enable port/service from firewall
+    firewalld:
+      port: "{{ item }}"
+      state: enabled
+    loop:
+      - 67/udp #used by dhcpd
+      - 69/udp #used by tftpd
+      - 80/tcp # used by httpd
+
+  - name: check whether directory {{ web_root_dir }}/{{ ESXi_version }} already existed
+    stat:
+      path: "{{ web_root_dir }}/{{ ESXi_version }}"
+    register: esxi_image_folder
+
+  - name: create directory for esxi image under web root
+    file:
+      state: directory
+      path: "{{ web_root_dir }}/{{ ESXi_version }}"
+      mode: 0755
+    when: esxi_image_folder.stat.exists == false
+
+  # Prepareing customized kickstart script file for  specified esxi host
+  #
+  #
+  - name: check whether directory {{ web_root_dir }}/{{ ks_script_dir }} already existed
+    stat:
+      path: "{{ web_root_dir }}/{{ ks_script_dir }}"
+    register: ks_script_folder
+
+  - name: create directory for esxi kickstart script under web root
+    file:
+      state: directory
+      path: "{{ web_root_dir }}/{{ ks_script_dir }}"
+      mode: 0755
+    when: ks_script_folder.stat.exists == false
+
+  - name: create dedicated kickstart file for specified hosts
+    copy:
+      src: ks-script.cfg
+      dest: "{{ web_root_dir }}/{{ ks_script_dir }}/ks-{{ item.MACAddr }}.cfg"
+    loop:
+      "{{ ESXi_Hosts }}"
+
+  - name: add network config to kickstart script file
+    blockinfile:
+      block: |
+        network --bootproto=static --device=vmnic0 --ip='{{ item.MGMT_IPAddr }}' --netmask='{{ item.MGMT_Netmask }}' --gateway='{{ item.MGMT_Gateway }}' --nameserver='{{ DNS_server }}' --addvmportgroup=0 --hostname='{{ item.Hostname }}'
+      insertafter: "# Set the network for the first network adapter"
+      path: "{{ web_root_dir }}/{{ ks_script_dir }}/ks-{{ item.MACAddr }}.cfg"
+    loop:
+      "{{ ESXi_Hosts }}"
+
+  # Prepareing customized boot config file for specified esxi host
+  #
+  #
+  - name: mount esxi iso to {{ web_root_dir }}/{{ ESXi_version }}
+    mount:
+      path: "{{ web_root_dir }}/{{ ESXi_version }}"
+      src: "{{ iso_dir }}/{{ esxi_iso_name }}"
+      fstype: iso9660
+      opts: ro,noauto,loop
+      state: mounted
+
+  - name: copy  boot loader configuration file to installation dir
+    copy:
+      src: "{{ item }}"
+      dest: "{{ tfpboot_dir }}/"
+    loop:
+       - "{{ web_root_dir }}/{{ ESXi_version }}/boot.cfg"
+
+  - name: modify boot.cfg,remove forward slash(/) in kernel and module section
+    replace:
+      path: "{{ tfpboot_dir }}/boot.cfg"
+      after: "kernel"
+      before: "build"
+      regexp: "/"
+      replace: ""
+
+  - name: generate new boot config file from original one and named based on esxi hosts' mac address
+    copy:
+      src: "{{ tfpboot_dir }}/boot.cfg"
+      dest: "{{ tfpboot_dir }}/boot-{{ item.MACAddr }}.cfg"
+    loop:
+      "{{ ESXi_Hosts }}"
+
+  - name: customized new generated boot.cfg, add web URL to this file
+    blockinfile:
+      block: |
+         prefix=http://{{ ansible_facts['default_ipv4']['address']}}/{{ ESXi_version }}
+         kernelopt=ks=http://{{ ansible_facts['default_ipv4']['address']}}/{{ ks_script_dir }}/ks-{{ item.MACAddr }}.cfg
+      path: "{{ tfpboot_dir }}/boot-{{ item.MACAddr }}.cfg"
+      state: present
+    loop:
+      "{{ ESXi_Hosts }}"

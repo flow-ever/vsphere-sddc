@@ -1,0 +1,85 @@
+# Accept the VMware End User License Agreement
+vmaccepteula
+
+# Set the root password for the DCUI and Tech Support Mode
+rootpw 123Qwe,.
+
+# Install on the first local disk available on machine
+clearpart --firstdisk --overwritevmfs
+install --firstdisk --overwritevmfs
+
+
+#keyboard
+keyboard "US Default"
+
+# Set the network to DHCP on the first network adapter
+#network --bootproto=dhcp --device=vmnic0
+network --bootproto=static --device=vmnic0 --ip='{{ esxi_mgmt_ip_addr }}' --netmask='{{ esxi_mgmt_netmask }}' --gateway='{{ esxi_mgmt_gateway }}' --nameserver='{{ DNS_server }}' --addvmportgroup=0 --hostname='{{ esxi_hostname }}'
+
+
+#reboot after installation
+reboot
+
+
+# A sample post-install script
+%post --interpreter=python --ignorefailure=true
+import time
+stampFile = open('/finished.stamp', mode='w')
+stampFile.write( time.asctime() )
+
+
+#Firstboot,running setup script at the firstboot
+%firstboot --interpreter=busybox
+
+sleep 30
+ 
+#Enter Maintenance mode
+#vim-cmd hostsvc/maintenance_mode_enter
+ 
+#suppress Shell Warning
+#esxcli system settings advanced set -o /UserVars/SuppressShellWarning -i 1
+#esxcli system settings advanced set -o /UserVars/ESXiShellTimeOut -i 1
+
+#VSwitch Configurations
+esxcli network vswitch standard add --vswitch-name=vSwitch0 --ports=24
+esxcli network vswitch standard uplink add --uplink-name=vmnic0 --vswitch-name=vSwitch0
+esxcli network vswitch standard uplink add --uplink-name=vmnic1 --vswitch-name=vSwitch0
+esxcli network vswitch standard uplink add --uplink-name=vmnic2 --vswitch-name=vSwitch0
+esxcli network vswitch standard uplink add --uplink-name=vmnic3 --vswitch-name=vSwitch0
+esxcli network vswitch standard policy failover set --active-uplinks=vmnic0,vmnic1,vmnic2,vmnic3 --vswitch-name=vSwitch0
+
+#Management network configurations
+esxcli network vswitch standard portgroup policy failover set --portgroup-name="Management Network" --active-uplinks=vmnic0 --standby-uplinks=vmnic1
+
+#create vmkernel vmk1 for vMotion
+esxcli network vswitch standard portgroup add --vswitch-name="vSwitch0" --portgroup-name="vMotion"
+esxcli network ip interface add -i vmk1 -p vMotion
+esxcli network vswitch standard portgroup policy failover set --portgroup-name="vMotion" --active-uplinks=vmnic1 --standby-uplinks=vmnic0
+{% if vMotion_vlan_id  != "" %}
+esxcli network vswitch standard portgroup set -p vMotion --vlan-id {{ vMotion_vlan_id }}
+{% endif %}
+esxcli network ip interface tag add -i vmk1 -t vmotion
+esxcli network ip interface ipv4 set -i vmk1 -t static -I '{{ vmotion_IP_Addr }}' -N '{{ vmotion_netmask }}'
+
+# Create port group for Virtual machines
+{% for vm_pg in vm_pgs %}
+esxcli network vswitch standard portgroup add --portgroup-name="{{ vm_pg.name }}" --vswitch-name=vSwitch0
+esxcli network vswitch standard portgroup policy failover set --portgroup-name="{{ vm_pg.name }}" --active-uplinks=vmnic2,vmnic3
+{% if vm_pg.vlanid != "" %}
+esxcli network vswitch standard portgroup set -p vMotion --vlan-id {{ vm_pg.vlanid }}
+{% endif %}
+{% endfor %}
+
+
+
+
+#Firstboot Section 2
+%firstboot --interpreter=busybox
+ 
+ 
+#Disable IPv6
+esxcli network ip set --ipv6-enabled=false
+ 
+#Reboot
+sleep 30
+reboot

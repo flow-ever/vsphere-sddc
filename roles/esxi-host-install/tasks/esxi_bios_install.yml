@@ -1,0 +1,47 @@
+---
+  - name: pareparing initial boot file for BIOS boot
+    copy:
+      src: "/usr/share/syslinux/gpxelinux.0"
+      dest: "{{ tfpboot_dir }}"
+
+  - name: check whether directory {{ tfpboot_dir }}/pxelinux.cfg already existed
+    stat:
+      path: "{{ tfpboot_dir }}/pxelinux.cfg"
+    register: pxelinux_folder
+
+  - name: create pxelinux.cfg directory for BIOS boot
+    file:
+      path: "{{ tfpboot_dir }}/pxelinux.cfg"
+      state: directory
+      mode: 0755
+    when: pxelinux_folder.stat.exists == false
+
+  - name: copy boot loader and boot loader configuration file to installation dir
+    copy:
+      src: "{{ web_root_dir }}/{{ ESXi_version }}/mboot.c32"
+      dest: "{{ tfpboot_dir }}/"
+
+  - name: create boot loader configuration file for BIOS boot
+    copy:
+      content: |
+        DEFAULT install
+        NOHALT 1
+        LABEL install
+          KERNEL mboot.c32
+          APPEND -c boot-{{ item.MACAddr }}.cfg
+          IPAPPEND 2
+      dest: "{{ tfpboot_dir }}/pxelinux.cfg/01-{{ item.MACAddr }}"
+    loop:
+      "{{ ESXi_Hosts }}"
+
+#verify whether esxi installation accomplished via pinging to esxi hosts,if pinged successfully, It is proved that the installation is accomplished
+  - name: ping ESXi hosts after installation
+    shell: |
+      ping -c 4  "{{ item.MGMT_IPAddr }}"  
+    register: ping_result
+    until: ping_result.rc == 0
+    retries: 10
+    delay: 60
+    loop: 
+      "{{ ESXi_Hosts }}"    
+    ignore_errors: true

@@ -1,0 +1,10 @@
+---
+# tasks file for esxi-host-install
+- include: prereqs.yml
+
+- include: esxi_bios_install.yml
+  when: boot_mode == 'BIOS'
+- include: esxi_uefi_install.yml
+  when: boot_mode == 'UEFI'
+  
+- include: cleanup.yml

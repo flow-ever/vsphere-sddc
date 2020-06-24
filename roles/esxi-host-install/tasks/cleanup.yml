@@ -1,0 +1,35 @@
+---
+- name: remove all files/folder used in installation
+  shell: /bin/rm -rf {{item }}
+  loop:
+    - "{{ tfpboot_dir }}/*"
+    - "{{ web_root_dir }}/{{ ks_script_dir }}/*"
+    - "{{ yum_repo_file }}"
+    - "/etc/dhcp/dhcpd.conf"
+
+
+- name: stop all service used in installation
+  service: 
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    "{{ services }}"
+
+- name: disable port/service from firewall
+  firewalld:
+    port: "{{ item }}"
+    state: disabled
+  loop:
+    - 67/udp #used by dhcpd
+    - 69/udp #used by tftpd
+    - 80/tcp # used by httpd
+
+- name: umount directories
+  mount: 
+    path: "{{ item }}"
+    state: unmounted
+  loop:
+    - "{{ centos_mount_path }}"
+    - "{{ web_root_dir }}/{{ ESXi_version }}"
+
+

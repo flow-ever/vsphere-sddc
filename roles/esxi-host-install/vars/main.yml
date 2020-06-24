@@ -1,0 +1,80 @@
+---
+# vars file for esxi-host-install
+    
+    ESXi_version: "6.5u3"
+    ks_script_dir: "esxi_ksFiles"
+    web_root_dir: "/var/www/html"
+    #repo setup
+    iso_dir: "/repo"
+    centos_iso_name: "CentOS-7-x86_64-DVD-1908.iso"
+    centos_mount_path: "/mnt"
+
+    esxi_iso_name: "VMware-VMvisor-Installer-201908001-14320405.x86_64.iso"
+
+
+
+    install_base_packages:
+      - dhcp
+      - tftp
+      - tftp-server
+      - xinetd
+      - httpd
+
+    services:
+      - dhcpd
+      - httpd
+      - xinetd
+      
+
+
+    dhcp_config_file: "dhcpd.conf"
+    dhcp_config_dir: "/etc/dhcp/"
+
+    yum_repo_file: '/etc/yum.repos.d/dvd_repo.repo'
+
+    tfpboot_dir: '/var/lib/tftpboot'
+    tftp_config_file: '/etc/xinetd.d/tftp'
+
+
+
+
+    vm_pgs:
+      - name: VLAN21
+        VLANID: 21
+      - name: VLAN22
+        VLANID: 22
+
+    DNS_server: "192.168.10.51,192.168.10.101"
+    DNS_suffix: "flow-ever.com"
+
+    boot_mode: "UEFI"
+    
+    ESXi_Hosts:
+      - Hostname: "fei-li-esxi01"
+        MGMT_IPAddr: "192.168.0.12"
+        MGMT_Netmask: "255.255.255.0"
+        MGMT_Gateway: "192.168.0.254"
+        MGMT_VLANID:
+        vMotion_IPAddr: "192.168.0.12"
+        vMotion_Netmask: "255.255.255.0"
+        vMotion_VLANID:  "29"
+        MACAddr: "00-50-56-95-68-4c"
+      - Hostname: "fei-li-esxi02"
+        MGMT_IPAddr: "192.168.0.13"
+        MGMT_Netmask: "255.255.255.0"
+        MGMT_Gateway: "192.168.0.254"
+        MGMT_VLANID: "29"
+        vMotion_IPAddr: "192.168.1.13"
+        vMotion_Netmask: "255.255.255.0"
+        vMotion_VLANID: "33"
+        MACAddr: "00-50-56-95-bf-a0"
+      - Hostname: "fei-li-esxi03"
+        MGMT_IPAddr: "192.168.0.14"
+        MGMT_Netmask: "255.255.255.0"
+        MGMT_Gateway: "192.168.0.254"
+        MGMT_VLANID: "29"
+        vMotion_IPAddr: "192.168.1.14"
+        vMotion_Netmask: "255.255.255.0"
+        vMotion_VLANID: "33"
+        MACAddr: "00-50-56-95-c2-2f"
+

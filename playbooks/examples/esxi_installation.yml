@@ -1,0 +1,61 @@
+---
+- name: setup a environment for ESXi installation via network
+  hosts: localhost
+  connection: local
+
+  vars:
+    boot_mode: "UEFI"
+    ESXi_version: "6.5u3"
+    ks_script_dir: "esxi_ksFiles"
+    web_root_dir: "/var/www/html"
+    #repo setup
+    iso_dir: "/repo"
+    centos_iso_name: "CentOS-7-x86_64-DVD-1908.iso"
+    esxi_iso_name: "VMware-VMvisor-Installer-201908001-14320405.x86_64.iso"
+
+    centos_mount_path: "/mnt"
+
+    
+
+    ESXi_Hosts:
+      - Hostname: "fei-li-esxi01"
+        MGMT_IPAddr: "192.168.0.12"
+        MGMT_Netmask: "255.255.255.0"
+        MGMT_Gateway: "192.168.0.254"
+        MGMT_VLANID:
+        vMotion_IPAddr: "192.168.0.12"
+        vMotion_Netmask: "255.255.255.0"
+        vMotion_VLANID:  "29"
+        MACAddr: "00-50-56-95-4a-61"
+      - Hostname: "fei-li-esxi02"
+        MGMT_IPAddr: "192.168.0.13"
+        MGMT_Netmask: "255.255.255.0"
+        MGMT_Gateway: "192.168.0.254"
+        MGMT_VLANID: "29"
+        vMotion_IPAddr: "192.168.1.13"
+        vMotion_Netmask: "255.255.255.0"
+        vMotion_VLANID: "33"
+        MACAddr: "00-50-56-95-fc-14"
+      - Hostname: "fei-li-esxi03"
+        MGMT_IPAddr: "192.168.0.13"
+        MGMT_Netmask: "255.255.255.0"
+        MGMT_Gateway: "192.168.0.254"
+        MGMT_VLANID: "29"
+        vMotion_IPAddr: "192.168.1.13"
+        vMotion_Netmask: "255.255.255.0"
+        vMotion_VLANID: "33"
+        MACAddr: "00-50-56-95-b5-8e"
+
+
+    vm_pgs:
+      - name: VLAN21
+        VLANID: 21
+      - name: VLAN22
+        VLANID: 22
+
+    DNS_server: "192.168.10.51,192.168.10.101"
+    DNS_suffix: "flow-ever.com"
+
+
+  roles:
+  - esxi-host-install

@@ -1,0 +1,40 @@
+---
+
+  - name: copy snponly.efi to /tftpboot
+    copy: 
+      src: snponly.efi
+      dest: "{{ tfpboot_dir }}/"
+  
+  - name: copy efi boot loader to /tftpboot
+    copy: 
+      src: "{{ web_root_dir }}/{{ ESXi_version }}/efi/boot/bootx64.efi"
+      dest: "{{ tfpboot_dir }}/mboot.efi"
+  
+  - name: Create a subdirectory of /tftpboot named after the MAC address of the target host machine (01-mac_address_of_target_ESXi_host)
+    file: 
+      state: directory
+      path: "{{ tfpboot_dir }}/01-{{ item.MACAddr }}"
+      mode: 0755
+    loop:
+      "{{ ESXi_Hosts }}"
+  
+  - name: copy boot file to the directory created last task
+    copy: 
+      src: "{{ tfpboot_dir }}/boot-{{ item.MACAddr }}.cfg"
+      dest: "{{ tfpboot_dir }}/01-{{ item.MACAddr }}/boot.cfg"
+    loop:
+      "{{ ESXi_Hosts }}"
+
+#verify whether esxi installation accomplished via pinging to esxi hosts,if pinged successfully, It is proved that the installation is accomplished
+  - name: ping ESXi hosts after installation
+    shell: |
+      ping -c 4  "{{ item.MGMT_IPAddr }}"  
+    register: ping_result
+    until: ping_result.rc == 0
+    retries: 10
+    delay: 60  
+    loop: 
+      "{{ ESXi_Hosts }}"    
+    ignore_errors: true
+  
+

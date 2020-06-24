@@ -16,7 +16,7 @@ Role Variables
 ```yaml
 repo_dir: '/opt/repo'
 vcsa_iso: 'VMware-VCSA-all-6.7.0-9451876.iso'
-vcsa_task_directory: '/opt/ansible/roles/vcsa-deploy/tasks'
+vcsa_task_directory: '/opt/ansible/roles/vcsa-deploy/tasks' 
 
 ovftool: '/mnt/vcsa/ovftool/lin64/ovftool'
 vcsa_ova: 'vcsa/VMware-vCenter-Server-Appliance-6.7.0.14000-9451876_OVF10.ova'
@@ -57,6 +57,7 @@ sso_domain_name: 'vsphere.local'
 Dependencies
 ------------
 
+python module netaddr must be installed(pip install netaddr or install from source with command python setup.py install )
 An Ansible Vault file must exist and include the following variables:
 
 ```yaml
